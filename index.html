@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passport Photo Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #1C2B45;
+    --paper: #F6F3ED;
+    --card: #FFFFFF;
+    --line: #DAD4C6;
+    --steel: #3A6EA5;
+    --steel-dark: #2C567F;
+    --stamp: #A5382F;
+    --muted: #6B7280;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  a{ color: var(--steel); }
+
+  .wrap{
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header.page-head{
+    display:flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .mark{
+    flex: none;
+    width: 40px; height: 40px;
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    position: relative;
+    margin-top: 4px;
+  }
+  .mark::before{
+    content:'';
+    position:absolute;
+    left:50%; top:50%;
+    width: 14px; height: 14px;
+    transform: translate(-50%,-50%);
+    border-radius: 50%;
+    background: var(--stamp);
+    opacity: .85;
+  }
+  h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: clamp(28px, 4vw, 38px);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  header.page-head p{
+    margin: 0;
+    max-width: 52ch;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .workspace{
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 820px){
+    .workspace{ grid-template-columns: 1fr; }
+  }
+
+  .card{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 28px;
+    position: relative;
+  }
+  /* registration-mark corners, echoing print/crop marks */
+  .card.stage::before, .card.stage::after,
+  .card.stage .c2, .card.stage .c3{
+    content:'';
+    position:absolute;
+    width: 14px; height: 14px;
+    border-color: var(--ink);
+    border-style: solid;
+    opacity: .55;
+  }
+  .card.stage::before{ top:-1px; left:-1px; border-width: 2px 0 0 2px; }
+  .card.stage::after{ top:-1px; right:-1px; border-width: 2px 2px 0 0; }
+  .card.stage .c2{ bottom:-1px; left:-1px; border-width: 0 0 2px 2px; }
+  .card.stage .c3{ bottom:-1px; right:-1px; border-width: 0 2px 2px 0; }
+
+  h2{
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 17px;
+    margin: 0 0 18px;
+  }
+
+  /* --- upload zone --- */
+  .upload-zone{
+    border: 1.5px dashed var(--line);
+    border-radius: 3px;
+    padding: 56px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .upload-zone:hover, .upload-zone.drag{
+    border-color: var(--steel);
+    background: #FAFAF7;
+  }
+  .upload-zone svg{ margin-bottom: 14px; opacity: .6; }
+  .upload-zone p{ margin: 0; font-size: 14.5px; }
+  .upload-zone .hint{ color: var(--muted); font-size: 13px; margin-top: 6px; }
+  input[type="file"]{ display: none; }
+
+  /* --- cropper --- */
+  .cropper{ display: none; }
+  .cropper.active{ display: block; }
+  .frame-stage{
+    display: flex;
+    justify-content: center;
+    margin-bottom: 18px;
+  }
+  .frame{
+    position: relative;
+    overflow: hidden;
+    background: #EDEAE2;
+    border: 1px solid var(--line);
+    touch-action: none;
+    cursor: grab;
+  }
+  .frame:active{ cursor: grabbing; }
+  .frame img{
+    position: absolute;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+  }
+  .frame svg.guide{
+    position: absolute;
+    top:0; left:0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .crop-controls{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+  .crop-controls label{ font-size: 13px; color: var(--muted); flex: none; }
+  input[type="range"]{
+    -webkit-appearance: none;
+    flex: 1;
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: var(--steel);
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--steel);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: var(--steel);
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--steel);
+  }
+
+  .row-actions{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    font-size: 13.5px;
+  }
+  .link-btn{
+    background: none; border: none;
+    color: var(--steel);
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+  }
+  .link-btn:hover{ color: var(--steel-dark); }
+
+  /* --- settings panel --- */
+  .field{ margin-bottom: 20px; }
+  .field:last-child{ margin-bottom: 0; }
+  .field label.field-label{
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+  select, .mm-inputs input[type="number"]{
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font: inherit;
+    font-size: 14px;
+    background: #fff;
+    color: var(--ink);
+  }
+  select:focus, .mm-inputs input:focus, input[type="range"]:focus{
+    outline: 2px solid var(--steel);
+    outline-offset: 1px;
+  }
+  .dims-note{
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 7px;
+  }
+  .mm-inputs{
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .mm-inputs span{ color: var(--muted); font-size: 13px; }
+
+  .check-row{
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+  }
+  .check-row input{ margin-top: 3px; }
+  .check-row .t{ font-size: 14px; }
+  .check-row .d{ font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+  .divider{
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 22px 0;
+  }
+
+  button.primary{
+    width: 100%;
+    padding: 13px 18px;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    font: inherit;
+    font-size: 14.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  button.primary:hover{ background: var(--steel-dark); }
+  button.primary:disabled{
+    background: #C9C4B8;
+    cursor: not-allowed;
+  }
+
+  /* --- results --- */
+  .results{
+    display: none;
+    margin-top: 24px;
+  }
+  .results.active{ display: block; }
+  .result-grid{
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .result-item{ text-align: center; }
+  .result-item img{
+    display: block;
+    border: 1px solid var(--line);
+    max-width: 180px;
+    height: auto;
+    margin-bottom: 10px;
+  }
+  .result-item.sheet img{ max-width: 220px; }
+  .result-item .meta{
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  a.download-btn{
+    display: inline-block;
+    padding: 8px 16px;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 13.5px;
+  }
+  a.download-btn:hover{ background: var(--ink); color: #fff; }
+
+  footer{
+    max-width: 1040px;
+    margin: 56px auto 0;
+    padding: 20px 24px 0;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="page-head">
+    <div class="mark" aria-hidden="true"></div>
+    <div>
+      <h1>Passport photos, cropped right.</h1>
+      <p>Upload a photo, pick the document you need it for, and position your face against the guide. Everything happens in your browser — nothing is uploaded anywhere.</p>
+    </div>
+  </header>
+
+  <div class="workspace">
+
+    <!-- STAGE -->
+    <section class="card stage">
+      <div class="c2"></div><div class="c3"></div>
+      <h2>1. Position your photo</h2>
+
+      <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Upload a photo">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1C2B45" stroke-width="1.4"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        <p>Drop a photo here, or click to choose one</p>
+        <p class="hint">JPG or PNG · face should be clear and forward-facing</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/png, image/jpeg">
+
+      <div class="cropper" id="cropper">
+        <div class="frame-stage">
+          <div class="frame" id="frame">
+            <img id="stageImg" alt="Your uploaded photo, being cropped">
+            <svg class="guide" id="guideSvg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+
+        <div class="crop-controls">
+          <label for="zoomRange">Zoom</label>
+          <input type="range" id="zoomRange" min="1" max="3" step="0.01" value="1">
+        </div>
+
+        <div class="row-actions">
+          <button class="link-btn" id="recenterBtn" type="button">Recenter</button>
+          <button class="link-btn" id="changePhotoBtn" type="button">Choose a different photo</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <aside class="card">
+      <h2>2. Choose your size</h2>
+
+      <div class="field">
+        <label class="field-label" for="presetSelect">Document / country</label>
+        <select id="presetSelect">
+          <option value="us">United States — visa & passport (2 × 2 in)</option>
+          <option value="india">India — passport (2 × 2 in)</option>
+          <option value="uk">United Kingdom — passport (35 × 45 mm)</option>
+          <option value="schengen">Schengen / EU — passport (35 × 45 mm)</option>
+          <option value="australia">Australia — passport (35 × 45 mm)</option>
+          <option value="canada">Canada — passport (50 × 70 mm)</option>
+          <option value="china">China — visa (33 × 48 mm)</option>
+          <option value="custom">Custom size…</option>
+        </select>
+        <div class="dims-note" id="dimsNote"></div>
+      </div>
+
+      <div class="field" id="customFields" style="display:none;">
+        <label class="field-label">Custom size (millimetres)</label>
+        <div class="mm-inputs">
+          <input type="number" id="customW" min="10" max="120" value="35">
+          <span>×</span>
+          <input type="number" id="customH" min="10" max="120" value="45">
+          <span>mm</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="check-row">
+          <input type="checkbox" id="guideToggle" checked>
+          <span>
+            <span class="t">Show positioning guide</span>
+            <span class="d">An outline for typical head height and centering — a helper, not an official template.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="field">
+        <label class="check-row">
+          <input type="checkbox" id="bgToggle" checked>
+          <span>
+            <span class="t">Replace background with white</span>
+            <span class="d">Detects you against the background and swaps in plain white — the most common reason photos get rejected.</span>
+          </span>
+        </label>
+        <div class="dims-note" id="bgStatus"></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <label class="check-row">
+          <input type="checkbox" id="sheetToggle">
+          <span>
+            <span class="t">Also lay out a 4×6 in print sheet</span>
+            <span class="d">Repeats your photo to fill one sheet, ready for a photo kiosk or home printer.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="field">
+        <button class="primary" id="generateBtn" disabled>Upload a photo to continue</button>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- RESULTS -->
+  <section class="results" id="results">
+    <hr class="divider">
+    <h2>Your photo</h2>
+    <div class="result-grid" id="resultGrid"></div>
+  </section>
+
+</div>
+
+<footer>
+  Processing happens entirely on your device — your photo is never sent to a server. Background detection downloads a small on-device model the first time you use it, but your photo itself never leaves your browser. Sizes here follow commonly published guidance; always check your document issuer's current requirements before submitting.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+<script>
+(function(){
+  const DPI = 300;
+  const PRESETS = {
+    us:        { label: "United States (2 × 2 in)", mmW: 50.8, mmH: 50.8 },
+    india:     { label: "India (2 × 2 in)",          mmW: 50.8, mmH: 50.8 },
+    uk:        { label: "United Kingdom (35 × 45 mm)", mmW: 35, mmH: 45 },
+    schengen:  { label: "Schengen / EU (35 × 45 mm)", mmW: 35, mmH: 45 },
+    australia: { label: "Australia (35 × 45 mm)",     mmW: 35, mmH: 45 },
+    canada:    { label: "Canada (50 × 70 mm)",        mmW: 50, mmH: 70 },
+    china:     { label: "China visa (33 × 48 mm)",    mmW: 33, mmH: 48 },
+  };
+
+  const uploadZone   = document.getElementById('uploadZone');
+  const fileInput    = document.getElementById('fileInput');
+  const cropperEl    = document.getElementById('cropper');
+  const frame        = document.getElementById('frame');
+  const stageImg     = document.getElementById('stageImg');
+  const guideSvg     = document.getElementById('guideSvg');
+  const zoomRange    = document.getElementById('zoomRange');
+  const recenterBtn  = document.getElementById('recenterBtn');
+  const changeBtn    = document.getElementById('changePhotoBtn');
+  const presetSelect = document.getElementById('presetSelect');
+  const customFields = document.getElementById('customFields');
+  const customW      = document.getElementById('customW');
+  const customH      = document.getElementById('customH');
+  const dimsNote     = document.getElementById('dimsNote');
+  const guideToggle  = document.getElementById('guideToggle');
+  const bgToggle     = document.getElementById('bgToggle');
+  const bgStatus     = document.getElementById('bgStatus');
+  const sheetToggle  = document.getElementById('sheetToggle');
+  const generateBtn  = document.getElementById('generateBtn');
+  const resultsEl    = document.getElementById('results');
+  const resultGrid   = document.getElementById('resultGrid');
+
+  let naturalW = 0, naturalH = 0;
+  let fitScale = 1, zoom = 1, scale = 1;
+  let offsetX = 0, offsetY = 0;
+  let frameW = 300, frameH = 300;
+  let hasImage = false;
+
+  let originalDataUrl = null;
+  let processedDataUrl = null;
+  let originalImgEl = null;
+  let segmenter = null;
+
+  function getSegmenter(){
+    if (!segmenter){
+      segmenter = new SelfieSegmentation({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+      });
+      segmenter.setOptions({ modelSelection: 1 });
+    }
+    return segmenter;
+  }
+
+  function segmentImage(imgEl){
+    return new Promise((resolve, reject) => {
+      try{
+        const seg = getSegmenter();
+        seg.onResults((results) => resolve(results.segmentationMask));
+        seg.send({ image: imgEl }).catch(reject);
+      } catch(err){ reject(err); }
+    });
+  }
+
+  function maskToAlphaCanvas(maskSource, w, h){
+    const mc = document.createElement('canvas');
+    mc.width = w; mc.height = h;
+    const mctx = mc.getContext('2d');
+    mctx.drawImage(maskSource, 0, 0, w, h);
+    const data = mctx.getImageData(0, 0, w, h);
+    const px = data.data;
+    for (let i = 0; i < px.length; i += 4){
+      const lum = px[i]; // mask is grayscale: r=g=b
+      px[i] = 0; px[i+1] = 0; px[i+2] = 0; px[i+3] = lum;
+    }
+    mctx.putImageData(data, 0, 0);
+    return mc;
+  }
+
+  function compositeWhiteBackground(imgEl, maskSource, w, h){
+    const fg = document.createElement('canvas');
+    fg.width = w; fg.height = h;
+    const fctx = fg.getContext('2d');
+    fctx.drawImage(imgEl, 0, 0, w, h);
+    const alphaCanvas = maskToAlphaCanvas(maskSource, w, h);
+    fctx.globalCompositeOperation = 'destination-in';
+    fctx.drawImage(alphaCanvas, 0, 0, w, h);
+
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const octx = out.getContext('2d');
+    octx.fillStyle = '#ffffff';
+    octx.fillRect(0, 0, w, h);
+    octx.drawImage(fg, 0, 0, w, h);
+    return out;
+  }
+
+  async function runBackgroundRemoval(){
+    if (!hasImage || !originalImgEl) return;
+    bgStatus.textContent = 'Detecting background\u2026';
+    generateBtn.disabled = true;
+    try{
+      const mask = await segmentImage(originalImgEl);
+      const composed = compositeWhiteBackground(originalImgEl, mask, naturalW, naturalH);
+      processedDataUrl = composed.toDataURL('image/png');
+      if (bgToggle.checked){
+        stageImg.src = processedDataUrl;
+        bgStatus.textContent = 'Background replaced with white.';
+      }
+    } catch(err){
+      console.error(err);
+      bgStatus.textContent = "Couldn't detect the background automatically \u2014 using your original photo.";
+      bgToggle.checked = false;
+    } finally {
+      generateBtn.disabled = !hasImage;
+    }
+  }
+
+  function currentMM(){
+    if (presetSelect.value === 'custom'){
+      return { mmW: parseFloat(customW.value) || 35, mmH: parseFloat(customH.value) || 45 };
+    }
+    const p = PRESETS[presetSelect.value];
+    return { mmW: p.mmW, mmH: p.mmH };
+  }
+
+  function mmToPx(mm){ return Math.round(mm / 25.4 * DPI); }
+
+  function updateDimsNote(){
+    const { mmW, mmH } = currentMM();
+    const pxW = mmToPx(mmW), pxH = mmToPx(mmH);
+    dimsNote.textContent = `Exports at ${pxW} × ${pxH}px (${DPI} dpi print quality)`;
+  }
+
+  function layoutFrame(){
+    const { mmW, mmH } = currentMM();
+    const ratio = mmW / mmH;
+    const MAX = 340;
+    if (ratio >= 1){
+      frameW = MAX; frameH = Math.round(MAX / ratio);
+    } else {
+      frameH = MAX; frameW = Math.round(MAX * ratio);
+    }
+    frame.style.width = frameW + 'px';
+    frame.style.height = frameH + 'px';
+    drawGuide();
+    updateDimsNote();
+  }
+
+  function drawGuide(){
+    guideSvg.innerHTML = '';
+    if (!guideToggle.checked) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    // head oval: roughly centered, top margin ~12%, spanning to ~78% height
+    const cx = 50, cy = 46, rx = 26, ry = 34;
+    const oval = document.createElementNS(ns, 'ellipse');
+    oval.setAttribute('cx', cx); oval.setAttribute('cy', cy);
+    oval.setAttribute('rx', rx); oval.setAttribute('ry', ry);
+    oval.setAttribute('fill', 'none');
+    oval.setAttribute('stroke', '#A5382F');
+    oval.setAttribute('stroke-width', '0.6');
+    oval.setAttribute('stroke-dasharray', '2.5,2');
+    oval.setAttribute('opacity', '0.75');
+    guideSvg.appendChild(oval);
+
+    const eyeLine = document.createElementNS(ns, 'line');
+    eyeLine.setAttribute('x1', 15); eyeLine.setAttribute('x2', 85);
+    eyeLine.setAttribute('y1', 40); eyeLine.setAttribute('y2', 40);
+    eyeLine.setAttribute('stroke', '#A5382F');
+    eyeLine.setAttribute('stroke-width', '0.4');
+    eyeLine.setAttribute('stroke-dasharray', '1.5,2');
+    eyeLine.setAttribute('opacity', '0.5');
+    guideSvg.appendChild(eyeLine);
+  }
+
+  function clampOffset(){
+    const dw = naturalW * scale, dh = naturalH * scale;
+    const maxX = Math.max(0, (dw - frameW) / 2);
+    const maxY = Math.max(0, (dh - frameH) / 2);
+    offsetX = Math.min(maxX, Math.max(-maxX, offsetX));
+    offsetY = Math.min(maxY, Math.max(-maxY, offsetY));
+  }
+
+  function render(){
+    scale = fitScale * zoom;
+    clampOffset();
+    const dw = naturalW * scale, dh = naturalH * scale;
+    const left = frameW/2 - dw/2 + offsetX;
+    const top  = frameH/2 - dh/2 + offsetY;
+    stageImg.style.width  = dw + 'px';
+    stageImg.style.height = dh + 'px';
+    stageImg.style.left   = left + 'px';
+    stageImg.style.top    = top + 'px';
+  }
+
+  function loadImageFile(file){
+    if (!file || !file.type.match(/^image\/(png|jpeg)$/)) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        naturalW = img.naturalWidth;
+        naturalH = img.naturalHeight;
+        originalDataUrl = e.target.result;
+        processedDataUrl = null;
+        originalImgEl = img;
+        stageImg.src = originalDataUrl;
+        layoutFrame();
+        fitScale = Math.max(frameW / naturalW, frameH / naturalH);
+        zoom = 1; offsetX = 0; offsetY = 0;
+        zoomRange.value = 1;
+        render();
+        hasImage = true;
+        cropperEl.classList.add('active');
+        uploadZone.style.display = 'none';
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate photo';
+        resultsEl.classList.remove('active');
+        resultGrid.innerHTML = '';
+        bgStatus.textContent = '';
+        if (bgToggle.checked) runBackgroundRemoval();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // --- upload interactions ---
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+  fileInput.addEventListener('change', (e) => loadImageFile(e.target.files[0]));
+
+  ['dragenter','dragover'].forEach(evt => uploadZone.addEventListener(evt, (e) => {
+    e.preventDefault(); uploadZone.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(evt => uploadZone.addEventListener(evt, (e) => {
+    e.preventDefault(); uploadZone.classList.remove('drag');
+  }));
+  uploadZone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    loadImageFile(file);
+  });
+
+  changeBtn.addEventListener('click', () => {
+    cropperEl.classList.remove('active');
+    uploadZone.style.display = '';
+    hasImage = false;
+    originalDataUrl = null;
+    processedDataUrl = null;
+    originalImgEl = null;
+    bgStatus.textContent = '';
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Upload a photo to continue';
+    resultsEl.classList.remove('active');
+    fileInput.value = '';
+  });
+
+  bgToggle.addEventListener('change', () => {
+    if (!hasImage) return;
+    if (bgToggle.checked){
+      if (processedDataUrl){
+        stageImg.src = processedDataUrl;
+        bgStatus.textContent = 'Background replaced with white.';
+      } else {
+        runBackgroundRemoval();
+      }
+    } else {
+      stageImg.src = originalDataUrl;
+      bgStatus.textContent = '';
+    }
+  });
+
+  recenterBtn.addEventListener('click', () => { offsetX = 0; offsetY = 0; render(); });
+
+  zoomRange.addEventListener('input', () => { zoom = parseFloat(zoomRange.value); render(); });
+
+  // --- drag to pan ---
+  let dragging = false, startX = 0, startY = 0, startOffX = 0, startOffY = 0;
+  frame.addEventListener('pointerdown', (e) => {
+    if (!hasImage) return;
+    dragging = true;
+    frame.setPointerCapture(e.pointerId);
+    startX = e.clientX; startY = e.clientY;
+    startOffX = offsetX; startOffY = offsetY;
+  });
+  frame.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    offsetX = startOffX + (e.clientX - startX);
+    offsetY = startOffY + (e.clientY - startY);
+    render();
+  });
+  frame.addEventListener('pointerup',   () => dragging = false);
+  frame.addEventListener('pointercancel', () => dragging = false);
+
+  frame.addEventListener('wheel', (e) => {
+    if (!hasImage) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    zoom = Math.min(3, Math.max(1, zoom + delta));
+    zoomRange.value = zoom;
+    render();
+  }, { passive: false });
+
+  // --- settings ---
+  presetSelect.addEventListener('change', () => {
+    customFields.style.display = presetSelect.value === 'custom' ? '' : 'none';
+    layoutFrame();
+    if (hasImage){
+      fitScale = Math.max(frameW / naturalW, frameH / naturalH);
+      offsetX = 0; offsetY = 0;
+      render();
+    }
+  });
+  customW.addEventListener('input', () => { layoutFrame(); if (hasImage){ fitScale = Math.max(frameW/naturalW, frameH/naturalH); offsetX=0; offsetY=0; render(); } });
+  customH.addEventListener('input', () => { layoutFrame(); if (hasImage){ fitScale = Math.max(frameW/naturalW, frameH/naturalH); offsetX=0; offsetY=0; render(); } });
+  guideToggle.addEventListener('change', drawGuide);
+
+  window.addEventListener('resize', () => { if(hasImage){ /* frame is fixed px, no resize needed */ } });
+
+  // --- generate output ---
+  function buildPhotoCanvas(){
+    const { mmW, mmH } = currentMM();
+    const targetW = mmToPx(mmW), targetH = mmToPx(mmH);
+    const k = targetW / frameW;
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW; canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetW, targetH);
+    const dw = naturalW * scale * k, dh = naturalH * scale * k;
+    const left = targetW/2 - dw/2 + offsetX * k;
+    const top  = targetH/2 - dh/2 + offsetY * k;
+    ctx.drawImage(stageImg, left, top, dw, dh);
+    return canvas;
+  }
+
+  function buildSheetCanvas(photoCanvas){
+    const sheetW = mmToPx(101.6); // 4in
+    const sheetH = mmToPx(152.4); // 6in
+    const margin = 30, gutter = 18;
+    const pw = photoCanvas.width, ph = photoCanvas.height;
+    const cols = Math.max(1, Math.floor((sheetW - margin*2 + gutter) / (pw + gutter)));
+    const rows = Math.max(1, Math.floor((sheetH - margin*2 + gutter) / (ph + gutter)));
+    const canvas = document.createElement('canvas');
+    canvas.width = sheetW; canvas.height = sheetH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, sheetW, sheetH);
+
+    const gridW = cols*pw + (cols-1)*gutter;
+    const gridH = rows*ph + (rows-1)*gutter;
+    const startX = (sheetW - gridW)/2;
+    const startY = (sheetH - gridH)/2;
+
+    ctx.strokeStyle = '#cccccc';
+    ctx.setLineDash([4,4]);
+    ctx.lineWidth = 1;
+
+    for (let r=0; r<rows; r++){
+      for (let c=0; c<cols; c++){
+        const x = startX + c*(pw+gutter);
+        const y = startY + r*(ph+gutter);
+        ctx.drawImage(photoCanvas, x, y, pw, ph);
+        ctx.strokeRect(x-4, y-4, pw+8, ph+8);
+      }
+    }
+    return { canvas, cols, rows };
+  }
+
+  function addResult(canvas, label, filename, extraClass){
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const item = document.createElement('div');
+    item.className = 'result-item' + (extraClass ? ' ' + extraClass : '');
+    item.innerHTML = `
+      <img src="${dataUrl}" alt="${label}">
+      <div class="meta">${label}<br>${canvas.width} × ${canvas.height}px</div>
+      <a class="download-btn" download="${filename}" href="${dataUrl}">Download</a>
+    `;
+    resultGrid.appendChild(item);
+  }
+
+  generateBtn.addEventListener('click', () => {
+    if (!hasImage) return;
+    resultGrid.innerHTML = '';
+    const photoCanvas = buildPhotoCanvas();
+    const presetName = presetSelect.value === 'custom' ? 'custom' : presetSelect.value;
+    addResult(photoCanvas, 'Passport photo', `passport-photo-${presetName}.jpg`);
+
+    if (sheetToggle.checked){
+      const { canvas: sheetCanvas, cols, rows } = buildSheetCanvas(photoCanvas);
+      addResult(sheetCanvas, `Print sheet (${cols * rows} copies, 4×6 in)`, `passport-photo-sheet-${presetName}.jpg`, 'sheet');
+    }
+    resultsEl.classList.add('active');
+    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // init
+  layoutFrame();
+})();
+</script>
+
+</body>
+</html>
